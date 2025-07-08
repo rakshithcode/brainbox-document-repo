@@ -1,0 +1,2 @@
+This is a dummy file for testing the document upload feature in BrainBox.
+You can use this file in Postman as the 'file' field when uploading a document.
