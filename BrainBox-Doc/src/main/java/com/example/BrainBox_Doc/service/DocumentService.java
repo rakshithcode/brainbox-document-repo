@@ -1,85 +1,74 @@
-// src/main/java/com/example/BrainBox_Doc/service/DocumentService.java
 package com.example.BrainBox_Doc.service;
 
 import com.example.BrainBox_Doc.model.Document;
 import com.example.BrainBox_Doc.repository.DocumentRepository;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.data.jpa.repository.JpaRepository;
 
-import jakarta.annotation.PostConstruct;
-import java.io.IOException;
-import java.net.MalformedURLException;
-import java.nio.file.*;
-import java.time.LocalDateTime;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Optional;
 
 @Service
 public class DocumentService {
 
-    @Value("${file.upload-dir}")
-    private String uploadDir;
+    @Autowired
+    private DocumentRepository documentRepository;
 
-    private final DocumentRepository documentRepository;
-
-    public DocumentService(DocumentRepository documentRepository) {
-        this.documentRepository = documentRepository;
+    public Document saveDocument(Document document) {
+        return documentRepository.save(document);
     }
 
-    @PostConstruct
-    public void init() {
-        try {
-            Files.createDirectories(Paths.get(uploadDir));
-        } catch (IOException e) {
-            throw new RuntimeException("Could not create upload folder!", e);
-        }
+    public List<Document> getAllDocuments() {
+        return documentRepository.findAll();
     }
 
-    public Document store(MultipartFile file, String title, String description, String tags, String category, String author) throws IOException {
-        String filename = System.currentTimeMillis() + "_" + file.getOriginalFilename();
-        Path filePath = Paths.get(uploadDir).resolve(filename);
-        Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
-
-        Document doc = new Document();
-        doc.setTitle(title);
-        doc.setDescription(description);
-        doc.setFilename(filename);
-        doc.setOriginalName(file.getOriginalFilename());
-        doc.setUploadDate(LocalDateTime.now());
-        doc.setAuthor(author);
-        doc.setTags(tags);
-        doc.setCategory(category);
-
-        return documentRepository.save(doc);
-    }
-
-    public List<Document> search(String query, String category, String author) {
-        if (query != null && !query.isEmpty()) {
-            return documentRepository.findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCaseOrTagsContainingIgnoreCase(query, query, query);
-        } else if (category != null && !category.isEmpty()) {
-            return documentRepository.findByCategory(category);
-        } else if (author != null && !author.isEmpty()) {
-            return documentRepository.findByAuthor(author);
-        } else {
-            return documentRepository.findAll();
-        }
-    }
-
-    public Optional<Document> getDocument(Long id) {
+    public Optional<Document> getDocumentById(Long id) {
         return documentRepository.findById(id);
     }
 
-    public Resource loadFileAsResource(String filename) throws MalformedURLException {
-        Path filePath = Paths.get(uploadDir).resolve(filename).normalize();
-        Resource resource = new UrlResource(filePath.toUri());
-        if (resource.exists()) {
-            return resource;
-        } else {
-            throw new RuntimeException("File not found " + filename);
+    public Optional<Document> updateDocument(Long id, Document updatedDocument) {
+        return documentRepository.findById(id).map(document -> {
+            document.setTitle(updatedDocument.getTitle());
+            document.setDescription(updatedDocument.getDescription());
+            // Add other fields as needed
+            return documentRepository.save(document);
+        });
+    }
+
+    public boolean deleteDocument(Long id) {
+        if (documentRepository.existsById(id)) {
+            documentRepository.deleteById(id);
+            return true;
         }
+        return false;
+    }
+
+    public Document store(MultipartFile file, String title, String description) {
+        System.out.println("Received file: " + (file != null ? file.getOriginalFilename() : "null"));
+        Document doc = new Document();
+        doc.setTitle(title);
+        doc.setDescription(description);
+
+        if (file != null && !file.isEmpty()) {
+            try {
+                String uploadDir = "uploads";
+                Path uploadPath = Paths.get(uploadDir);
+                if (!Files.exists(uploadPath)) {
+                    Files.createDirectories(uploadPath);
+                }
+                String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
+                Path filePath = uploadPath.resolve(fileName);
+                file.transferTo(filePath.toFile());
+                // Optionally, save file name/path in the Document entity
+                // doc.setFileName(fileName);
+            } catch (Exception e) {
+                throw new RuntimeException("File saving failed", e);
+            }
+        }
+        return documentRepository.save(doc);
     }
 }

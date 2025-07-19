@@ -1,7 +1,11 @@
 package com.example.BrainBox_Doc.model;
 
-import jakarta.persistence.*;
 import java.time.LocalDateTime;
+
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
 
 @Entity
 public class Document {

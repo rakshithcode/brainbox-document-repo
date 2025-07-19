@@ -3,53 +3,66 @@ package com.example.BrainBox_Doc.controller;
 
 import com.example.BrainBox_Doc.model.Document;
 import com.example.BrainBox_Doc.service.DocumentService;
-import org.springframework.core.io.Resource;
-import org.springframework.http.HttpHeaders;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Optional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.net.MalformedURLException;
-import java.util.List;
-
+@CrossOrigin(origins = "http://localhost:3000")
 @RestController
-@RequestMapping("/documents")
+@RequestMapping("/api/documents")
 public class DocumentController {
 
-    private final DocumentService documentService;
+    @Autowired
+    private DocumentService documentService;
 
-    public DocumentController(DocumentService documentService) {
-        this.documentService = documentService;
-    }
-
-    @PostMapping("/upload")
-    public ResponseEntity<Document> uploadDocument(
+    // CREATE
+    @PostMapping
+    public ResponseEntity<?> uploadDocument(
             @RequestParam("file") MultipartFile file,
-            @RequestParam String title,
-            @RequestParam String description,
-            @RequestParam String tags,
-            @RequestParam String category,
-            @RequestParam String author) throws IOException {
-        Document doc = documentService.store(file, title, description, tags, category, author);
-        return ResponseEntity.ok(doc);
+            @RequestParam("title") String title,
+            @RequestParam("description") String description) {
+        try {
+            Document doc = documentService.store(file, title, description);
+            return ResponseEntity.ok(doc);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Upload failed: " + e.getMessage());
+        }
     }
 
+    // READ ALL
     @GetMapping
-    public List<Document> searchDocuments(
-            @RequestParam(required = false) String query,
-            @RequestParam(required = false) String category,
-            @RequestParam(required = false) String author) {
-        return documentService.search(query, category, author);
+    public List<Document> getAllDocuments() {
+        return documentService.getAllDocuments();
     }
 
-    @GetMapping("/{id}/download")
-    public ResponseEntity<Resource> downloadDocument(@PathVariable Long id) throws MalformedURLException {
-        Document doc = documentService.getDocument(id)
-                .orElseThrow(() -> new RuntimeException("Document not found"));
-        Resource resource = documentService.loadFileAsResource(doc.getFilename());
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + doc.getOriginalName() + "\"")
-                .body(resource);
+    // READ BY ID
+    @GetMapping("/{id}")
+    public ResponseEntity<Document> getDocumentById(@PathVariable Long id) {
+        Optional<Document> document = documentService.getDocumentById(id);
+        return document.map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    // UPDATE
+    @PutMapping("/{id}")
+    public ResponseEntity<Document> updateDocument(@PathVariable Long id, @RequestBody Document updatedDocument) {
+        Optional<Document> document = documentService.updateDocument(id, updatedDocument);
+        return document.map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    // DELETE
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteDocument(@PathVariable Long id) {
+        boolean deleted = documentService.deleteDocument(id);
+        if (deleted) {
+            return ResponseEntity.noContent().build();
+        } else {
+            return ResponseEntity.notFound().build();
+        }
     }
 }
